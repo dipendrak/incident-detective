@@ -227,3 +227,4 @@ for the full explanation.
 - Wilson score interval: E. B. Wilson, "Probable inference, the law of
   succession, and statistical inference," *JASA*, 1927.
 - Code was written with help from Claude (Anthropic) as an AI coding assistant.
+# incident-detective
