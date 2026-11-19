@@ -1,0 +1,29 @@
+Likelihood weighting failure case (simulated data, N = 12, 2000 incidents per setting, 1000 samples)
+
+What we see
+  In the low-noise setting (fp 0.001, fn 0.01), incidents with 0-1 alarms keep a median
+  effective sample size of 72.4 out of 1000 samples, with a mean total
+  variation distance to the exact posterior of 0.002. Incidents with 8+
+  alarms drop to a median ESS of 7.3, the distance grows to 0.196,
+  and top-1 accuracy is 0.87 for exact vs 0.85 for LW.
+  See failure_case.csv for every bucket and both noise settings.
+
+What is happening
+  Likelihood weighting draws the root and the failures from the prior, without looking
+  at the alarms, and only afterwards weights each sample by P(alarms | failures). That
+  weight is a product of one factor per service. A sample that leaves an alarmed service
+  healthy pays a factor of fp (0.001 here), and a sample that fails a silent service pays
+  a factor of fn (0.01). With many alarms, a sample has to reproduce the whole pattern of
+  failures almost exactly to avoid these penalties, and forward simulation from the prior
+  rarely does that. A few lucky samples then carry nearly all of the weight, so the
+  posterior estimate is effectively built from a handful of samples. The ESS,
+  (sum w)^2 / sum w^2, measures exactly this.
+
+  Lower noise makes the penalty factors smaller, so the weights become more uneven for
+  the same number of alarms. The model is not wrong here: exact inference on the same
+  evidence stays accurate. The failure is purely in the sampler.
+
+What would help
+  More samples (cost grows linearly), a proposal that looks at the alarms (for example,
+  drawing the root near alarmed services and correcting with importance weights), or an
+  MCMC method such as Gibbs sampling. A low ESS is a useful warning sign to report.
