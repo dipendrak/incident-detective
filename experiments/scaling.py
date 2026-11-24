@@ -7,18 +7,18 @@ time is still recorded so the figure shows where the limit was crossed.
 
 from __future__ import annotations
 
-import argparse
 import time
 from pathlib import Path
 
-from common import COLORS, DEFAULT_OUT, SEED, setup_style, write_csv
+# `common` must be imported first: it puts the repo root on sys.path.
+from common import COLORS, DEFAULT_OUT, SEED, cli, setup_style, write_csv
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 from diagnose.exact import exact_posterior
 from diagnose.graph import generate_graph
-from diagnose.metrics import top_k_hit, ranking_from_scores, wilson_ci
+from diagnose.metrics import ranking_from_scores, top_k_hit, wilson_ci
 from diagnose.model import Params
 from diagnose.sampling import likelihood_weighting
 from diagnose.simulate import simulate_incident
@@ -85,6 +85,7 @@ def run(out_dir: Path = DEFAULT_OUT, quick: bool = False) -> list[dict]:
 
 
 def _row(n: int, method: str, times: list[float], hits: int, n_incidents: int, status: str) -> dict:
+    """One CSV row: mean run time and top-1 accuracy (with 95% CI) for a method at size n."""
     lo, hi = wilson_ci(hits, n_incidents)
     return {"n": n, "method": method, "mean_time_s": float(np.mean(times)), "top1": hits / n_incidents,
             "top1_lo": lo, "top1_hi": hi, "n_incidents": n_incidents, "status": status}
@@ -122,8 +123,4 @@ def plot(rows: list[dict], path: Path, n_incidents: int) -> None:
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--quick", action="store_true")
-    ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    args = ap.parse_args()
-    run(args.out, args.quick)
+    cli(run, __doc__)

@@ -22,6 +22,7 @@ from diagnose.simulate import simulate_incident  # noqa: E402
 
 
 def test_generator_reproducible() -> None:
+    """Same seed gives the same graph, and parents always come before children."""
     a, b = generate_graph(12, seed=7), generate_graph(12, seed=7)
     assert a == b
     assert a != generate_graph(12, seed=8)
@@ -31,6 +32,7 @@ def test_generator_reproducible() -> None:
 
 
 def test_simulator_reproducible() -> None:
+    """Same seed gives the same incident, and the root is always marked failed."""
     g = generate_graph(12, seed=3)
     x = simulate_incident(g, Params(), np.random.default_rng(42))
     y = simulate_incident(g, Params(), np.random.default_rng(42))
@@ -42,6 +44,7 @@ def test_simulator_reproducible() -> None:
 
 @pytest.mark.parametrize("seed", [0, 1, 2])
 def test_exact_posterior_sums_to_one(seed: int) -> None:
+    """The exact posterior is a valid probability distribution."""
     g = generate_graph(10, seed=seed)
     inc = simulate_incident(g, Params(), np.random.default_rng(seed))
     post = exact_posterior(g, Params(), inc.alarms)
@@ -51,6 +54,7 @@ def test_exact_posterior_sums_to_one(seed: int) -> None:
 
 
 def test_chain_without_noise_blames_most_upstream_alarm() -> None:
+    """With no noise on a chain, the first alarmed service must be the root."""
     g = chain_graph(6)
     params = Params(p_prop=1.0, leak=0.0, fp_rate=0.0, fn_rate=0.0)
     alarms = np.array([0, 0, 1, 1, 1, 1], dtype=bool)  # root must be service 2
@@ -60,6 +64,7 @@ def test_chain_without_noise_blames_most_upstream_alarm() -> None:
 
 
 def test_likelihood_weighting_close_to_exact() -> None:
+    """With many samples, likelihood weighting lands close to the exact answer."""
     g = generate_graph(8, seed=5)
     params = Params()
     inc = simulate_incident(g, params, np.random.default_rng(5))
@@ -70,6 +75,7 @@ def test_likelihood_weighting_close_to_exact() -> None:
 
 
 def test_baselines_return_valid_rankings() -> None:
+    """Every baseline ranks each service exactly once."""
     g = generate_graph(12, seed=11)
     inc = simulate_incident(g, Params(), np.random.default_rng(11))
     rankings = [
@@ -82,6 +88,7 @@ def test_baselines_return_valid_rankings() -> None:
 
 
 def test_run_all_quick(tmp_path: Path) -> None:
+    """The quick experiment run finishes and writes every output file."""
     result = subprocess.run(
         [sys.executable, str(ROOT / "experiments" / "run_all.py"), "--quick", "--out", str(tmp_path)],
         capture_output=True, text=True, timeout=300,

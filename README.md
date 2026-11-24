@@ -2,22 +2,52 @@
 
 COMP 560 (Artificial Intelligence) final project.
 
-**Team:** _[Name 1 (PID)], [Name 2 (PID)], [Name 3 (PID)]_
+| Team member | PID |
+|---|---|
+| Dipendra Kandle | _PID_ |
+| Aarav Tiwari | _PID_ |
+| Ayug Poudel | _PID_ |
+
+## Deliverables
+
+| Deliverable | Location |
+|---|---|
+| Paper, compiled PDF (4 pages, conference style) | [`paper/paper.pdf`](paper/paper.pdf) |
+| Paper, LaTeX source | [`paper/`](paper/) (`paper.tex`, style file, figures, `references.bib`) |
+| Presentation slides (5 minutes) | [`slides/slides.pdf`](slides/slides.pdf) |
+| Demo recording | _link or `slides/demo.mp4`_ |
+| Source code | [`diagnose/`](diagnose/), [`experiments/`](experiments/), [`app.py`](app.py) |
+| Results (CSVs and figures in the paper) | [`results/`](results/) |
 
 ## Summary
 
-When one service in a system fails, the services that depend on it often fail
-too, and the monitoring system raises a burst of alarms. Some alarms are false
-and some real failures raise no alarm. We model this as a Bayesian network and
-ask:
+When one service in a software system fails, the services that depend on it
+often fail too, and the monitoring system raises a burst of alarms. Some alarms
+are false, and some real failures raise no alarm at all. We model this as a
+Bayesian network and ask:
 
 > Given the alarms, can Bayesian inference identify the root cause more
 > accurately than simple heuristics, and how do exact inference and
 > sampling-based approximate inference compare in accuracy and run time as the
 > graph and the noise level grow?
 
-There is no model training. Every probability is set by hand, and all data is
-simulated from the model itself.
+**Main findings (simulated data):**
+
+1. Bayesian inference beats both heuristic baselines at every noise level we
+   tried. At default noise, exact inference gets 0.74 top-1 accuracy vs 0.65
+   for the best heuristic; at a 30 percent false-alarm rate the gap grows to
+   0.40 vs 0.23.
+2. Likelihood weighting matches exact inference in accuracy, and its error
+   shrinks roughly as 1 / sqrt(samples).
+3. Exact inference by enumeration grows as 2^N and hits our 0.1 s per
+   incident limit at N = 18 services; likelihood weighting stays near a few
+   milliseconds.
+4. Likelihood weighting breaks down when there are many alarms and very little
+   noise: its effective sample size collapses (72 down to about 7 out of
+   1,000) and its posterior drifts away from the exact one.
+
+There is no model training and no external dataset. Every probability is set
+by hand, and all data is simulated from the model itself.
 
 ### The model
 
@@ -45,35 +75,49 @@ simulated from the model itself.
    We also report the effective sample size `(sum w)^2 / sum w^2`.
 3. **Baselines** (`diagnose/baselines.py`): (a) the most upstream alarmed
    service, (b) the alarmed service with the most alarmed descendants,
-   (c) a random ranking.
+   (c) a random ranking (chance level).
 
 Each method returns a full ranking of suspects. We score top-1 and top-3
 accuracy against the injected root cause.
 
 ## Setup
 
-Python 3.11 or newer. No network access or API keys are needed.
+Requires Python 3.11 or newer (tested on 3.11 and 3.14, macOS). No GPU,
+network access, API keys, datasets or pretrained models are needed.
 
 ```bash
+git clone https://github.com/dipendrak/incident-detective.git
+cd incident-detective
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Commands
+## Reproducing the results
+
+Run every command from the repository root.
 
 | What | Command | Time (Apple Silicon laptop) |
 |---|---|---|
 | Run the tests | `python -m pytest -q` | about 6 s |
-| Launch the demo | `streamlit run app.py` | opens at http://localhost:8501 |
-| Reproduce every figure, quick | `python experiments/run_all.py --quick` | about 7 s |
-| Reproduce every figure, full | `python experiments/run_all.py` | about 35 s |
-| One experiment only | `python experiments/scaling.py` (add `--quick` if wanted) | 5 to 10 s each |
+| **Reproduce every result in the paper** | `python experiments/run_all.py` | about 35 s |
+| Quick smoke run (fewer incidents) | `python experiments/run_all.py --quick` | about 7 s |
+| One experiment only | `python experiments/<name>.py` (add `--quick` if wanted) | 5 to 10 s each |
+| Launch the interactive demo | `streamlit run app.py` | opens at http://localhost:8501 |
 
-Every script uses fixed seeds, so running it again gives the same CSVs and
-figures. Run times are the one exception: they come from the machine's clock.
-`--out DIR` writes to a different folder (the tests use this so they do not
-overwrite `results/`).
+`run_all.py` overwrites the CSVs and figures in `results/`. Add `--out DIR` to
+write somewhere else instead (the tests do this).
+
+Every script uses fixed seeds (base seed 560), so a rerun gives exactly the
+same CSVs, figures and numbers. The only exception is run time in the scaling
+experiment, which depends on the machine.
+
+| Paper result | Script | Output files |
+|---|---|---|
+| Accuracy vs noise (Experiment 1) | `experiments/accuracy_vs_noise.py` | `results/accuracy_vs_noise.{csv,png}` |
+| Sampling convergence (Experiment 2) | `experiments/sampling_convergence.py` | `results/sampling_convergence.{csv,png}` |
+| Scaling with graph size (Experiment 3) | `experiments/scaling.py` | `results/scaling.{csv,png}` |
+| Likelihood weighting failure case (Experiment 4) | `experiments/failure_case.py` | `results/failure_case.{csv,png,txt}` |
 
 ### Using the demo
 
@@ -88,36 +132,37 @@ blamed. Raising the noise sliders flattens the posterior.
 ## Repository layout
 
 ```
-diagnose/
-  graph.py       random DAG generator, layers, descendants
-  model.py       parameters, noisy-OR failure model, alarm model, forward sampling
-  exact.py       exact inference by enumeration
-  sampling.py    likelihood weighting with effective sample size
-  baselines.py   three heuristic baselines
-  simulate.py    simulate_incident(graph, params, rng): inject, cascade, alarm
-  metrics.py     rankings, top-k, total variation, confidence intervals
+diagnose/                   core library
+  graph.py                  random DAG generator, layers, descendants
+  model.py                  parameters, noisy-OR failure model, alarm model, forward sampling
+  exact.py                  exact inference by enumeration
+  sampling.py               likelihood weighting with effective sample size
+  baselines.py              three heuristic baselines
+  simulate.py               simulate_incident: inject a fault, cascade it, raise alarms
+  metrics.py                rankings, top-k, total variation, confidence intervals
 experiments/
-  accuracy_vs_noise.py      experiment 1
-  sampling_convergence.py   experiment 2
-  scaling.py                experiment 3
-  failure_case.py           experiment 4
-  run_all.py                runs all four (supports --quick)
-  common.py                 shared helpers and plot style
+  accuracy_vs_noise.py      Experiment 1
+  sampling_convergence.py   Experiment 2
+  scaling.py                Experiment 3
+  failure_case.py           Experiment 4
+  run_all.py                runs all four (supports --quick and --out)
+  common.py                 shared helpers, plot style, command-line options
 tests/test_diagnose.py      pytest suite
 app.py                      Streamlit demo
-results/                    CSVs, figures, failure_case.txt
-paper/  slides/             (empty, for the write-up)
+results/                    CSVs, figures and failure_case.txt produced by run_all.py
+paper/                      LaTeX source and compiled PDF of the report
+slides/                     presentation slides (and demo recording)
 ```
 
 ## Results
 
-All numbers are from `python experiments/run_all.py` on simulated data. 95
+All numbers come from `python experiments/run_all.py` on simulated data. 95
 percent confidence intervals are in parentheses: Wilson intervals for
 accuracies, normal intervals for means. Experiments 1, 2 and 4 draw a new random
 graph for each incident (graph seed `560 + k` for incident `k`), so results are
 averaged over graph shapes as well as over incidents.
 
-### 1. Accuracy vs noise (`results/accuracy_vs_noise.png`)
+### 1. Accuracy vs noise
 
 N = 12, 300 incidents per setting, likelihood weighting with 5,000 samples.
 At default noise (fp 0.05, fn 0.1):
@@ -133,17 +178,15 @@ At default noise (fp 0.05, fn 0.1):
 The Bayesian methods beat both heuristics at every noise level we tried, on
 both top-1 and top-3. The top-1 gap grows with the false-positive rate (from
 0.06 at fp 0.01 to 0.16 at fp 0.3) and stays near 0.07 to 0.10 across the
-false-negative sweep. At a false-positive rate of 0.3, exact inference gets 0.40
-top-1 while the best heuristic gets 0.23. Heuristics trust every alarm, so a
-single false alarm upstream fools "most upstream". The posterior instead weighs
-how likely each alarm pattern is under each candidate root. With low noise
-(fp 0.01) all non-random methods are close (0.83 exact vs 0.78 heuristics).
-Exact and likelihood weighting are within sampling noise of each other
-throughout.
+false-negative sweep. Heuristics trust every alarm, so a single false alarm
+upstream fools "most upstream". The posterior instead weighs how likely each
+alarm pattern is under each candidate root. With low noise (fp 0.01) all
+non-random methods are close (0.83 exact vs 0.78 heuristics). Exact and
+likelihood weighting are within sampling noise of each other throughout.
 
 ![accuracy vs noise](results/accuracy_vs_noise.png)
 
-### 2. Sampling convergence (`results/sampling_convergence.png`)
+### 2. Sampling convergence
 
 N = 12, default noise, 200 incidents.
 
@@ -154,16 +197,15 @@ N = 12, default noise, 200 incidents.
 | Mean effective sample size | 9 | 65 | 557 | 5,446 |
 
 The error falls roughly as one over the square root of the number of samples
-(a straight line on the log-log plot). Top-1 agreement levels off near 0.93. We
-checked every disagreement at 100,000 samples: all of them are near-ties in the
-exact posterior (top two suspects within about 0.001 of each other, often
-two services the alarms cannot tell apart). Such cases need far more samples to
-break the tie, and the tie barely matters for accuracy. Note that the effective
-sample size is only about 5 percent of the raw sample count.
+(a straight line on the log-log plot). Top-1 agreement levels off near 0.93.
+Every disagreement at 100,000 samples is a near-tie in the exact posterior (top
+two suspects within about 0.001, often two services the alarms cannot tell
+apart), so it barely matters for accuracy. The effective sample size is only
+about 5 percent of the raw sample count.
 
 ![sampling convergence](results/sampling_convergence.png)
 
-### 3. Scaling (`results/scaling.png`)
+### 3. Scaling
 
 100 incidents per graph size, likelihood weighting with 5,000 samples. Exact
 inference is stopped once its mean time per incident exceeds 0.1 s.
@@ -173,26 +215,24 @@ inference is stopped once its mean time per incident exceeds 0.1 s.
 | Exact, ms per incident | 0.1 | 0.5 | 2.6 | 9.5 | 48 | 225 (stopped) |
 | Likelihood weighting, ms | 0.7 | 1.2 | 1.3 | 1.5 | 1.6 | 3.5 |
 
-For N of 12 and above, exact time grows by about 4 to 5 times for every 2
+For N of 12 and above, exact time grows about 4 to 5 times for every 2
 services added (the `2^N` enumeration). It becomes slower than likelihood
-weighting between N = 10 and N = 12 and **hits the
-time limit at N = 18**. Likelihood weighting grows only linearly in N. Top-1
-accuracy is the same for both wherever exact finishes (for example 0.64 vs
-0.64 at N = 16).
+weighting between N = 10 and N = 12 and hits the time limit at N = 18.
+Likelihood weighting grows only linearly in N. Top-1 accuracy is the same for
+both wherever exact finishes (0.64 vs 0.64 at N = 16).
 
 ![scaling](results/scaling.png)
 
-### 4. Failure case for likelihood weighting (`results/failure_case.png`, `results/failure_case.txt`)
+### 4. Failure case for likelihood weighting
 
 N = 12, 2,000 incidents per setting, 1,000 samples. In the low-noise setting
 (fp 0.001, fn 0.01), the median effective sample size drops from 72 with 0 to 1
-alarms to about 7 with 8 or more alarms. Over the same range the total
-variation distance to exact grows from 0.002 to 0.196. Likelihood weighting
-proposes failures from the prior without looking at the alarms. Each sample
-that disagrees with an alarm pays a factor of fp or fn in its weight, so with
-many alarms only a few lucky samples carry almost all the weight. Exact
-inference on the same evidence is unaffected. See `results/failure_case.txt`
-for the full explanation.
+alarms to about 7 with 8 or more alarms, and the total variation distance to
+exact grows from 0.002 to 0.196. Likelihood weighting proposes failures from
+the prior without looking at the alarms. Each sample that disagrees with an
+alarm pays a factor of fp or fn in its weight, so with many alarms a few lucky
+samples carry almost all the weight. Exact inference on the same evidence is
+unaffected. See `results/failure_case.txt` for the full explanation.
 
 ![failure case](results/failure_case.png)
 
@@ -200,9 +240,10 @@ for the full explanation.
 
 - **Single root cause.** The model assumes exactly one fault per incident.
   Real outages can have several independent causes at once.
-- **Synthetic graphs.** Graphs are random DAGs with at most 3 parents per node,
-  not real service topologies. Real systems may have hubs, cycles (retries,
-  mutual dependencies), or hundreds of services.
+- **Synthetic graphs and data.** Graphs are random DAGs with at most 3 parents
+  per node, not real service topologies, and all incidents are simulated from
+  the same model used for inference. Real systems may have hubs, cycles
+  (retries, mutual dependencies), or hundreds of services.
 - **Known noise rates.** Inference uses the true `p_prop`, `leak`, `fp_rate` and
   `fn_rate`. In practice they would have to be estimated, and a wrong value
   could hurt the Bayesian methods, which rely on them, while the heuristics do
@@ -217,8 +258,9 @@ for the full explanation.
 
 ## Credits
 
-- All code was written for this project using only numpy, matplotlib,
-  streamlit and pytest. No outside code was copied.
+- All code was written for this project. It uses only the open-source
+  libraries numpy, matplotlib, streamlit and pytest. No outside code, data or
+  pretrained models were used.
 - Bayesian networks, noisy-OR, enumeration and likelihood weighting follow
   S. Russell and P. Norvig, *Artificial Intelligence: A Modern Approach*, 4th
   ed., Chapters 13 and 14.
@@ -227,4 +269,3 @@ for the full explanation.
 - Wilson score interval: E. B. Wilson, "Probable inference, the law of
   succession, and statistical inference," *JASA*, 1927.
 - Code was written with help from Claude (Anthropic) as an AI coding assistant.
-# incident-detective

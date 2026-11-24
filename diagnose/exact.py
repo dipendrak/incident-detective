@@ -12,7 +12,7 @@ from functools import lru_cache
 import numpy as np
 
 from diagnose.graph import Graph
-from diagnose.model import Params, _safe_log, fail_prob, log_alarm_likelihood
+from diagnose.model import Params, fail_prob, log_alarm_likelihood, safe_log
 
 
 @lru_cache(maxsize=4)
@@ -31,14 +31,20 @@ def _logsumexp(x: np.ndarray) -> float:
 
 
 def exact_posterior(graph: Graph, params: Params, alarms: np.ndarray) -> np.ndarray:
-    """Return the exact posterior P(R = r | A) as an array of length N."""
+    """Return the exact posterior P(R = r | A) as an array of length N.
+
+    In plain terms: for each suspect r, pretend r is the root cause, add up
+    the probability of every possible failure pattern times how well that
+    pattern explains the alarms, and then rescale so the N scores sum to 1.
+    Work is done in log space so tiny probabilities do not underflow to 0.
+    """
     n = graph.n
     f = all_configurations(n)
     # Number of failed parents of every node in every configuration.
     k = f.astype(np.int32) @ graph.parent_matrix()
     p = fail_prob(k, params)
     # node_log[s, i] = log P(F_i | parents) if i is NOT the root.
-    node_log = np.where(f, _safe_log(p), _safe_log(1.0 - p))
+    node_log = np.where(f, safe_log(p), safe_log(1.0 - p))
     log_lik = log_alarm_likelihood(f, alarms, params)
     # Sum of all node terms, kept as (finite part, number of -inf terms) so
     # that one node's term can be removed later without computing inf - inf.
@@ -59,5 +65,6 @@ def exact_posterior(graph: Graph, params: Params, alarms: np.ndarray) -> np.ndar
 
     z = _logsumexp(log_post)
     if not np.isfinite(z):
+        # No root can explain the alarms (only possible with zero noise rates).
         return np.full(n, 1.0 / n)
     return np.exp(log_post - z)

@@ -25,7 +25,12 @@ def simulate_incident(
     rng: np.random.Generator,
     root: int | None = None,
 ) -> Incident:
-    """Inject a root cause (random unless given), cascade it, and raise noisy alarms."""
+    """Create one fake outage: break a service, let the failure spread, raise alarms.
+
+    The root is random unless `root` is given. Only `alarms` would be visible
+    to an operator; `root` and `failures` are the hidden ground truth we
+    score against.
+    """
     if root is None:
         root = int(rng.integers(0, graph.n))
     failures = sample_failures(graph, params, np.array([root]), rng)

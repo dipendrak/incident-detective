@@ -1,7 +1,7 @@
 """Regenerate every CSV and figure in results/ with one command.
 
     python experiments/run_all.py           # full run
-    python experiments/run_all.py --quick   # smaller run, under 2 minutes
+    python experiments/run_all.py --quick   # smaller run, a few seconds
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ import argparse
 import time
 from pathlib import Path
 
+# `common` must be imported first: it puts the repo root on sys.path.
 from common import DEFAULT_OUT
 
 import accuracy_vs_noise

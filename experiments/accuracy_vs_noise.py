@@ -8,10 +8,10 @@ the same graphs.
 
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 
-from common import COLORS, DEFAULT_OUT, METHODS, SEED, rank_all_methods, setup_style, write_csv
+# `common` must be imported first: it puts the repo root on sys.path.
+from common import COLORS, DEFAULT_OUT, METHODS, SEED, cli, rank_all_methods, setup_style, write_csv
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -30,6 +30,7 @@ def evaluate(params: Params, n_incidents: int, n_samples: int) -> dict[str, dict
     """Count top-1 and top-3 hits per method over n_incidents simulated incidents."""
     hits = {m: {"top1": 0, "top3": 0} for m in METHODS}
     for k in range(n_incidents):
+        # Same graph and random stream for incident k in every noise setting.
         graph = generate_graph(N, seed=SEED + k)
         rng = np.random.default_rng(SEED + k)
         inc = simulate_incident(graph, params, rng)
@@ -43,6 +44,7 @@ def run(out_dir: Path = DEFAULT_OUT, quick: bool = False) -> list[dict]:
     """Run both sweeps, write CSV and figure, return the rows."""
     n_incidents = 60 if quick else 300
     n_samples = 1000 if quick else 5000
+    # Each setting is (which sweep, fp rate, fn rate).
     settings = [("fp", fp, 0.1) for fp in FP_VALUES] + [("fn", 0.05, fn) for fn in FN_VALUES]
 
     rows: list[dict] = []
@@ -88,8 +90,4 @@ def plot(rows: list[dict], path: Path, n_incidents: int) -> None:
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--quick", action="store_true")
-    ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    args = ap.parse_args()
-    run(args.out, args.quick)
+    cli(run, __doc__)

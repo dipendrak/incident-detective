@@ -7,10 +7,10 @@ simulated incidents at N = 12 with default noise.
 
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 
-from common import COLORS, DEFAULT_OUT, SEED, setup_style, write_csv
+# `common` must be imported first: it puts the repo root on sys.path.
+from common import COLORS, DEFAULT_OUT, SEED, cli, setup_style, write_csv
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -32,6 +32,8 @@ def run(out_dir: Path = DEFAULT_OUT, quick: bool = False) -> list[dict]:
     sizes = SAMPLE_SIZES[:5] if quick else SAMPLE_SIZES
     params = Params()
 
+    # Simulate the incidents and their exact posteriors once, then reuse them
+    # for every sample budget.
     incidents = []
     for k in range(n_incidents):
         graph = generate_graph(N, seed=SEED + k)
@@ -87,8 +89,4 @@ def plot(rows: list[dict], path: Path, n_incidents: int) -> None:
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--quick", action="store_true")
-    ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    args = ap.parse_args()
-    run(args.out, args.quick)
+    cli(run, __doc__)

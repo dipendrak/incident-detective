@@ -1,10 +1,17 @@
-"""Shared helpers for the experiment scripts."""
+"""Shared helpers for the experiment scripts.
+
+Every experiment script imports this module first. Importing it puts the repo
+root on sys.path (so `import diagnose` works when a script is run directly)
+and switches matplotlib to a non-interactive backend that just writes files.
+"""
 
 from __future__ import annotations
 
+import argparse
 import csv
 import sys
 from pathlib import Path
+from typing import Callable
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -59,7 +66,10 @@ def setup_style() -> None:
 def rank_all_methods(
     graph: Graph, params: Params, alarms: np.ndarray, n_samples: int, rng: np.random.Generator
 ) -> dict[str, list[int]]:
-    """Run every method on one incident and return each ranking."""
+    """Run every method on one incident and return each one's ranking of suspects.
+
+    A ranking is a list of service indices, most suspicious first.
+    """
     post = exact_posterior(graph, params, alarms)
     lw = likelihood_weighting(graph, params, alarms, n_samples, rng)
     return {
@@ -78,3 +88,12 @@ def write_csv(path: Path, rows: list[dict]) -> None:
         writer = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         writer.writerows(rows)
+
+
+def cli(run: Callable[[Path, bool], object], doc: str | None) -> None:
+    """Command-line entry point shared by the experiment scripts (--quick, --out)."""
+    ap = argparse.ArgumentParser(description=doc)
+    ap.add_argument("--quick", action="store_true", help="fewer incidents and samples")
+    ap.add_argument("--out", type=Path, default=DEFAULT_OUT, help="output directory")
+    args = ap.parse_args()
+    run(args.out, args.quick)

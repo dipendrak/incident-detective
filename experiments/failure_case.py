@@ -13,14 +13,14 @@ and compare a default noise setting with a low-noise one. LW uses a modest
 
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 
-from common import COLORS, DEFAULT_OUT, SEED, setup_style, write_csv
+# `common` must be imported first: it puts the repo root on sys.path.
+from common import DEFAULT_OUT, SEED, cli, setup_style, write_csv
 
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.ticker import NullFormatter, ScalarFormatter
 
 from diagnose.exact import exact_posterior
 from diagnose.graph import generate_graph
@@ -56,6 +56,7 @@ def run(out_dir: Path = DEFAULT_OUT, quick: bool = False) -> list[dict]:
             inc = simulate_incident(graph, params, rng)
             post = exact_posterior(graph, params, inc.alarms)
             lw = likelihood_weighting(graph, params, inc.alarms, N_SAMPLES, rng)
+            # One record per incident: alarm count, ESS, TV distance, exact hit, LW hit.
             records.append((
                 int(inc.alarms.sum()), lw.ess, total_variation(post, lw.posterior),
                 int(np.argmax(post) == inc.root), int(np.argmax(lw.posterior) == inc.root),
@@ -65,6 +66,7 @@ def run(out_dir: Path = DEFAULT_OUT, quick: bool = False) -> list[dict]:
             sel = rec[(rec[:, 0] >= lo) & (rec[:, 0] <= hi)]
             if len(sel) == 0:
                 continue
+            # Summarize every incident whose alarm count falls in this bucket.
             rows.append({
                 "setting": name, "alarms": bucket_label(lo, hi), "n_incidents": len(sel),
                 "median_ess": float(np.median(sel[:, 1])), "ess_fraction": float(np.median(sel[:, 1]) / N_SAMPLES),
@@ -92,8 +94,8 @@ def plot(rows: list[dict], path: Path, n_incidents: int) -> None:
         axes[1].plot(x, [r["mean_tv"] for r in sel], marker="o", color=color, label=name)
         axes[2].plot(x, [r["exact_top1"] - r["lw_top1"] for r in sel], marker="o", color=color, label=name)
     axes[0].set_yscale("log")
-    axes[0].yaxis.set_major_formatter(matplotlib.ticker.ScalarFormatter())
-    axes[0].yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    axes[0].yaxis.set_major_formatter(ScalarFormatter())
+    axes[0].yaxis.set_minor_formatter(NullFormatter())
     axes[0].set_ylabel(f"median ESS (of {N_SAMPLES} samples)")
     axes[0].set_title("Effective sample size collapses")
     axes[1].set_ylabel("mean TV distance to exact")
@@ -147,8 +149,4 @@ What would help
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--quick", action="store_true")
-    ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    args = ap.parse_args()
-    run(args.out, args.quick)
+    cli(run, __doc__)

@@ -8,7 +8,12 @@ from diagnose.graph import Graph
 
 
 def most_upstream(graph: Graph, alarms: np.ndarray) -> list[int]:
-    """Blame alarmed services in topological order, then the silent ones."""
+    """Blame the alarmed service that sits highest up in the graph.
+
+    Idea: a failure flows downstream, so the first alarm in topological order
+    is the likeliest source. Alarmed services come first (upstream to
+    downstream), then the silent ones.
+    """
     alarmed = [i for i in range(graph.n) if alarms[i]]
     silent = [i for i in range(graph.n) if not alarms[i]]
     return alarmed + silent
@@ -17,7 +22,8 @@ def most_upstream(graph: Graph, alarms: np.ndarray) -> list[int]:
 def most_alarmed_descendants(graph: Graph, alarms: np.ndarray) -> list[int]:
     """Blame the alarmed service whose downstream services alarm the most.
 
-    Ties are broken by topological order. Silent services come last.
+    Idea: a true root should "explain" many alarms below it. Ties are broken
+    by topological order. Silent services come last.
     """
     desc = graph.descendants()
     score = [sum(bool(alarms[d]) for d in desc[i]) for i in range(graph.n)]
@@ -27,5 +33,5 @@ def most_alarmed_descendants(graph: Graph, alarms: np.ndarray) -> list[int]:
 
 
 def random_ranking(graph: Graph, rng: np.random.Generator) -> list[int]:
-    """A uniformly random ranking (chance level)."""
+    """A uniformly random ranking, showing what pure chance scores."""
     return [int(i) for i in rng.permutation(graph.n)]

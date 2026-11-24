@@ -1,6 +1,10 @@
 """Streamlit demo: diagnose the root cause of a simulated incident.
 
 Run with:  streamlit run app.py
+
+Streamlit reruns this whole file from top to bottom every time a widget
+changes. Values that must survive a rerun (which incident we are on, and its
+root cause) are kept in st.session_state.
 """
 
 from __future__ import annotations
@@ -8,7 +12,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # so `import diagnose` works
 
 import matplotlib
 
@@ -25,6 +29,7 @@ from diagnose.model import Params
 from diagnose.sampling import likelihood_weighting
 from diagnose.simulate import Incident, simulate_incident
 
+# Colors shared with the experiment figures.
 EXACT_COLOR = "#2a78d6"
 LW_COLOR = "#eb6834"
 FAILED_COLOR = "#e34948"
@@ -33,6 +38,7 @@ INK = "#0b0b0b"
 
 plt.rcParams.update({"font.size": 15, "axes.spines.top": False, "axes.spines.right": False})
 
+# Page setup, with larger fonts so the demo is readable on a projector.
 st.set_page_config(page_title="Root-cause diagnosis", layout="wide")
 st.markdown(
     """
@@ -81,11 +87,13 @@ def draw_graph(graph: Graph, inc: Incident) -> plt.Figure:
     width = max(8.0, 1.6 * (np.ptp(pos[:, 0]) + 2))
     height = max(4.0, 1.5 * (np.ptp(pos[:, 1]) + 1.5))
     fig, ax = plt.subplots(figsize=(width, height))
+    # One arrow per dependency, from parent j to child i.
     for i, ps in enumerate(graph.parents):
         for j in ps:
             ax.annotate("", xy=pos[i], xytext=pos[j],
                         arrowprops=dict(arrowstyle="-|>", color="#8a8984", lw=1.5,
                                         shrinkA=22, shrinkB=22, mutation_scale=18))
+    # One circle per service: fill shows failed or healthy, outline shows alarm.
     for i, name in enumerate(graph.names()):
         color = FAILED_COLOR if inc.failures[i] else HEALTHY_COLOR
         edge_w = 4.5 if inc.alarms[i] else 1.0
@@ -133,6 +141,8 @@ fn = st.sidebar.slider("Missed alarm rate (false negative)", 0.0, 0.5, 0.1, 0.01
 n_samples = st.sidebar.select_slider("Samples for likelihood weighting", [500, 1000, 5000, 20000, 50000], 5000)
 seed = int(st.sidebar.number_input("Seed", min_value=0, max_value=10_000, value=0, step=1))
 
+# Every new incident bumps incident_id, which changes the random seed used to
+# simulate the cascade and the alarms.
 if "incident_id" not in st.session_state:
     st.session_state.incident_id = 0
     st.session_state.root = int(np.random.default_rng([seed, 0]).integers(0, n))
@@ -147,9 +157,10 @@ if st.sidebar.button("Choose root cause", width="stretch"):
     st.session_state.incident_id += 1
     st.session_state.root = graph.names().index(chosen)
 if st.session_state.root >= n:
+    # The graph was shrunk with the slider; keep the root inside the graph.
     st.session_state.root = n - 1
 
-# Simulate and diagnose.
+# Simulate the incident, then run both inference methods on its alarms only.
 params = Params(p_prop=p_prop, fp_rate=fp, fn_rate=fn)
 rng = np.random.default_rng([seed, st.session_state.incident_id, 1])
 inc = simulate_incident(graph, params, rng, root=st.session_state.root)
@@ -157,6 +168,7 @@ exact = exact_posterior(graph, params, inc.alarms)
 lw = likelihood_weighting(graph, params, inc.alarms, n_samples, np.random.default_rng([seed, 2]))
 names = graph.names()
 
+# Page body: the graph, the two posteriors, and a summary table.
 st.title("Which service caused the outage?")
 st.markdown("All data on this page is **simulated**. Nothing here comes from a real system.")
 
@@ -175,6 +187,7 @@ caption(
 )
 
 st.subheader("What each method blamed")
+# Each method's single top suspect.
 blame = {
     "Exact inference": int(np.argmax(exact)),
     "Likelihood weighting": int(np.argmax(lw.posterior)),
