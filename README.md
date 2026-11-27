@@ -13,7 +13,7 @@ COMP 560 (Artificial Intelligence) final project.
 | Deliverable | Location |
 |---|---|
 | Paper, compiled PDF (4 pages, conference style) | [`paper/paper.pdf`](paper/paper.pdf) |
-| Paper, LaTeX source | [`paper/`](paper/) (`paper.tex`, style file, figures, `references.bib`) |
+| Paper, LaTeX source | [`paper/`](paper/) (`paper.tex`, `references.bib`, `neurips_2023.sty`, `figures/`) |
 | Presentation slides (5 minutes) | [`slides/slides.pdf`](slides/slides.pdf) |
 | Demo recording | _link or `slides/demo.mp4`_ |
 | Source code | [`diagnose/`](diagnose/), [`experiments/`](experiments/), [`app.py`](app.py) |
@@ -42,9 +42,10 @@ Bayesian network and ask:
 3. Exact inference by enumeration grows as 2^N and hits our 0.1 s per
    incident limit at N = 18 services; likelihood weighting stays near a few
    milliseconds.
-4. Likelihood weighting breaks down when there are many alarms and very little
-   noise: its effective sample size collapses (72 down to about 7 out of
-   1,000) and its posterior drifts away from the exact one.
+4. Likelihood weighting degrades on incidents with many alarms: its effective
+   sample size collapses (at low noise, from 72 to between 5 and 7 out of
+   1,000) and its posterior drifts away from the exact one, though top-1
+   accuracy drops by at most 0.04.
 
 There is no model training and no external dataset. Every probability is set
 by hand, and all data is simulated from the model itself.
@@ -103,6 +104,8 @@ Run every command from the repository root.
 | **Reproduce every result in the paper** | `python experiments/run_all.py` | about 35 s |
 | Quick smoke run (fewer incidents) | `python experiments/run_all.py --quick` | about 7 s |
 | One experiment only | `python experiments/<name>.py` (add `--quick` if wanted) | 5 to 10 s each |
+| Redraw the paper's figures from the CSVs | `python experiments/paper_figures.py` | about 2 s |
+| Rebuild the paper PDF | `cd paper && tectonic paper.tex` | about 5 s |
 | Launch the interactive demo | `streamlit run app.py` | opens at http://localhost:8501 |
 
 `run_all.py` overwrites the CSVs and figures in `results/`. Add `--out DIR` to
@@ -112,12 +115,19 @@ Every script uses fixed seeds (base seed 560), so a rerun gives exactly the
 same CSVs, figures and numbers. The only exception is run time in the scaling
 experiment, which depends on the machine.
 
+The paper uses the official NeurIPS 2023 style file, unchanged, with only the
+footer notice replaced by the course name. To rebuild the PDF, install a LaTeX
+distribution or the single-binary [Tectonic](https://tectonic-typesetting.github.io/)
+(`brew install tectonic` on macOS). Overleaf also works: upload the `paper/`
+folder and compile `paper.tex`.
+
 | Paper result | Script | Output files |
 |---|---|---|
 | Accuracy vs noise (Experiment 1) | `experiments/accuracy_vs_noise.py` | `results/accuracy_vs_noise.{csv,png}` |
 | Sampling convergence (Experiment 2) | `experiments/sampling_convergence.py` | `results/sampling_convergence.{csv,png}` |
 | Scaling with graph size (Experiment 3) | `experiments/scaling.py` | `results/scaling.{csv,png}` |
 | Likelihood weighting failure case (Experiment 4) | `experiments/failure_case.py` | `results/failure_case.{csv,png,txt}` |
+| Figures 1 to 3 in the paper | `experiments/paper_figures.py` | `paper/figures/{accuracy,cost,failure}.pdf` |
 
 ### Using the demo
 
@@ -146,11 +156,12 @@ experiments/
   scaling.py                Experiment 3
   failure_case.py           Experiment 4
   run_all.py                runs all four (supports --quick and --out)
+  paper_figures.py          redraws results/*.csv as the paper's figures
   common.py                 shared helpers, plot style, command-line options
 tests/test_diagnose.py      pytest suite
 app.py                      Streamlit demo
 results/                    CSVs, figures and failure_case.txt produced by run_all.py
-paper/                      LaTeX source and compiled PDF of the report
+paper/                      paper.tex, references.bib, NeurIPS style, figures/, paper.pdf
 slides/                     presentation slides (and demo recording)
 ```
 
@@ -196,12 +207,13 @@ N = 12, default noise, 200 incidents.
 | Top-1 agreement with exact | 0.82 | 0.91 | 0.94 | 0.94 |
 | Mean effective sample size | 9 | 65 | 557 | 5,446 |
 
-The error falls roughly as one over the square root of the number of samples
-(a straight line on the log-log plot). Top-1 agreement levels off near 0.93.
-Every disagreement at 100,000 samples is a near-tie in the exact posterior (top
-two suspects within about 0.001, often two services the alarms cannot tell
-apart), so it barely matters for accuracy. The effective sample size is only
-about 5 percent of the raw sample count.
+The error falls along a straight line on the log-log plot with a slope of
+about -0.4, a little slower than one over the square root of the number of
+samples. Top-1 agreement levels off around 0.93 to 0.94. Of the 13 incidents
+that still disagree at 100,000 samples, 12 are near-ties in the exact posterior
+(top two suspects within 0.005, often two services the alarms cannot tell
+apart). The last has a gap of 0.026. The effective sample size is only about 5
+to 10 percent of the raw sample count.
 
 ![sampling convergence](results/sampling_convergence.png)
 
@@ -227,8 +239,10 @@ both wherever exact finishes (0.64 vs 0.64 at N = 16).
 
 N = 12, 2,000 incidents per setting, 1,000 samples. In the low-noise setting
 (fp 0.001, fn 0.01), the median effective sample size drops from 72 with 0 to 1
-alarms to about 7 with 8 or more alarms, and the total variation distance to
-exact grows from 0.002 to 0.196. Likelihood weighting proposes failures from
+alarms to between 5 and 7 with 6 or more alarms, and the total variation
+distance to exact grows from 0.002 to 0.196. The error grows almost as much at
+default noise (0.019 to 0.163), so the number of alarms matters more than the
+noise level. Top-1 accuracy loses at most 0.04 against exact inference. Likelihood weighting proposes failures from
 the prior without looking at the alarms. Each sample that disagrees with an
 alarm pays a factor of fp or fn in its weight, so with many alarms a few lucky
 samples carry almost all the weight. Exact inference on the same evidence is
