@@ -4,9 +4,9 @@ COMP 560 (Artificial Intelligence) final project.
 
 | Team member | PID |
 |---|---|
-| Dipendra Kandle | _PID_ |
-| Aarav Tiwari | _PID_ |
-| Ayug Poudel | _PID_ |
+| Dipendra Kandel | 730761234 |
+| Aarav Tiwari | 730773007 |
+| Ayug Poudel | 730768375 |
 
 ## Deliverables
 
@@ -15,7 +15,7 @@ COMP 560 (Artificial Intelligence) final project.
 | Paper, compiled PDF (4 pages, conference style) | [`paper/paper.pdf`](paper/paper.pdf) |
 | Paper, LaTeX source | [`paper/`](paper/) (`paper.tex`, `references.bib`, `neurips_2023.sty`, `figures/`) |
 | Presentation slides (5 minutes) | [`slides/slides.pdf`](slides/slides.pdf) |
-| Demo recording | _link or `slides/demo.mp4`_ |
+| Demo | Shown live during the in-class presentation on November 19. Run it yourself with `streamlit run app.py` (see [Using the demo](#using-the-demo)). |
 | Source code | [`diagnose/`](diagnose/), [`experiments/`](experiments/), [`app.py`](app.py) |
 | Results (CSVs and figures in the paper) | [`results/`](results/) |
 
@@ -83,16 +83,33 @@ accuracy against the injected root cause.
 
 ## Setup
 
-Requires Python 3.11 or newer (tested on 3.11 and 3.14, macOS). No GPU,
-network access, API keys, datasets or pretrained models are needed.
+Requires Python 3.11 or newer (tested on Python 3.11 and 3.14 on macOS, and
+Python 3.13 on Windows 11). No GPU, network access, API keys, datasets or
+pretrained models are needed.
+
+macOS / Linux:
 
 ```bash
 git clone https://github.com/dipendrak/incident-detective.git
 cd incident-detective
 python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+Windows (PowerShell):
+
+```powershell
+git clone https://github.com/dipendrak/incident-detective.git
+cd incident-detective
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+If PowerShell refuses to run `Activate.ps1`, run
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, or skip activation
+and call `.venv\Scripts\python` directly in place of `python` below.
 
 ## Reproducing the results
 
@@ -100,8 +117,8 @@ Run every command from the repository root.
 
 | What | Command | Time (Apple Silicon laptop) |
 |---|---|---|
-| Run the tests | `python -m pytest -q` | about 6 s |
-| **Reproduce every result in the paper** | `python experiments/run_all.py` | about 35 s |
+| Run the tests | `python -m pytest -q` | about 6 s (12 s on a Windows laptop) |
+| **Reproduce every result in the paper** | `python experiments/run_all.py` | about 35 s (46 s on a Windows laptop) |
 | Quick smoke run (fewer incidents) | `python experiments/run_all.py --quick` | about 7 s |
 | One experiment only | `python experiments/<name>.py` (add `--quick` if wanted) | 5 to 10 s each |
 | Redraw the paper's figures from the CSVs | `python experiments/paper_figures.py` | about 2 s |
@@ -111,14 +128,17 @@ Run every command from the repository root.
 `run_all.py` overwrites the CSVs and figures in `results/`. Add `--out DIR` to
 write somewhere else instead (the tests do this).
 
-Every script uses fixed seeds (base seed 560), so a rerun gives exactly the
-same CSVs, figures and numbers. The only exception is run time in the scaling
-experiment, which depends on the machine.
+Every script uses fixed seeds (base seed 560), so a rerun gives the same CSVs,
+figures and numbers. Run times in the scaling experiment depend on the machine.
+Across operating systems, a few CSV values can also differ in the last
+floating-point digit (around 1e-17), which does not change any reported number.
+We checked this by rerunning everything on Windows 11 and comparing with the
+committed results.
 
 The paper uses the official NeurIPS 2023 style file, unchanged, with only the
 footer notice replaced by the course name. To rebuild the PDF, install a LaTeX
 distribution or the single-binary [Tectonic](https://tectonic-typesetting.github.io/)
-(`brew install tectonic` on macOS). Overleaf also works: upload the `paper/`
+(`brew install tectonic` on macOS; see its site for Windows). Overleaf also works: upload the `paper/`
 folder and compile `paper.tex`.
 
 | Paper result | Script | Output files |
@@ -162,7 +182,7 @@ tests/test_diagnose.py      pytest suite
 app.py                      Streamlit demo
 results/                    CSVs, figures and failure_case.txt produced by run_all.py
 paper/                      paper.tex, references.bib, NeurIPS style, figures/, paper.pdf
-slides/                     presentation slides (and demo recording)
+slides/                     presentation slides (PDF export)
 ```
 
 ## Results
